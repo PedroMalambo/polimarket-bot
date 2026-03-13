@@ -100,25 +100,24 @@ def evaluate_open_positions(latest_candidates: list[dict]) -> dict:
 
         market_id = str(position.get("market_id"))
         latest_market = latest_by_market_id.get(market_id)
-        if not latest_market:
-            continue
 
-        current_price = latest_market.get("yes_price")
-        if current_price is None:
-            continue
-
-        position["current_price"] = current_price
+        if latest_market and latest_market.get("yes_price") is not None:
+            current_price = float(latest_market.get("yes_price"))
+            position["current_price"] = current_price
+        else:
+            current_price = float(position.get("current_price", position.get("entry_price", 0.0)))
 
         close_reason = None
-        if current_price <= position["stop_loss_price"]:
+        if current_price <= float(position["stop_loss_price"]):
             close_reason = "STOP_LOSS"
-        elif current_price >= position["take_profit_price"]:
+        elif current_price >= float(position["take_profit_price"]):
             close_reason = "TAKE_PROFIT"
 
         if close_reason:
             position["status"] = "CLOSED"
             position["closed_at_utc"] = utc_now_iso()
             position["close_reason"] = close_reason
+            position["current_price"] = current_price
 
             exit_trade = {
                 "trade_id": str(uuid4()),
@@ -128,7 +127,7 @@ def evaluate_open_positions(latest_candidates: list[dict]) -> dict:
                 "action": f"SELL_YES_PAPER_{close_reason}",
                 "price": current_price,
                 "shares": position["shares"],
-                "notional_usd": round(position["shares"] * current_price, 6),
+                "notional_usd": round(float(position["shares"]) * current_price, 6),
                 "phase": position["phase"],
                 "timestamp_utc": utc_now_iso(),
             }
