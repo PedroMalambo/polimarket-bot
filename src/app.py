@@ -26,6 +26,7 @@ def run_bot_cycle() -> dict:
     app_logger.info(f"MAX_SPREAD={settings.MAX_SPREAD}")
     app_logger.info(f"MAX_SLIPPAGE_PCT={settings.MAX_SLIPPAGE_PCT}")
     app_logger.info(f"MAX_OPEN_POSITIONS={settings.MAX_OPEN_POSITIONS}")
+    app_logger.info(f"MARKET_COOLDOWN_MINUTES={settings.MARKET_COOLDOWN_MINUTES}")
 
     health = run_polymarket_healthcheck()
     app_logger.info(f"POLYMARKET_HEALTHCHECK_OK={health['ok']}")

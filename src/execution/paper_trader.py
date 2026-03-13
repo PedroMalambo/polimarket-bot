@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, UTC
 from uuid import uuid4
 
+from src.config.settings import get_settings
 from src.portfolio.ledger_store import (
     ensure_ledger_files,
     find_open_position_by_market_id,
@@ -17,8 +18,44 @@ def utc_now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def parse_iso_datetime(value: str) -> datetime:
+    return datetime.fromisoformat(value)
+
+
+def get_latest_trade_for_market(market_id: str) -> dict | None:
+    trades = load_trades()
+    market_trades = [t for t in trades if str(t.get("market_id")) == str(market_id)]
+
+    if not market_trades:
+        return None
+
+    market_trades.sort(key=lambda t: t.get("timestamp_utc", ""))
+    return market_trades[-1]
+
+
+def is_market_in_cooldown(market_id: str, cooldown_minutes: int) -> tuple[bool, dict | None, float | None]:
+    latest_trade = get_latest_trade_for_market(market_id)
+    if not latest_trade:
+        return False, None, None
+
+    timestamp_utc = latest_trade.get("timestamp_utc")
+    if not timestamp_utc:
+        return False, latest_trade, None
+
+    latest_trade_dt = parse_iso_datetime(timestamp_utc)
+    now_dt = datetime.now(UTC)
+    elapsed_seconds = (now_dt - latest_trade_dt).total_seconds()
+    elapsed_minutes = elapsed_seconds / 60
+
+    if elapsed_minutes < cooldown_minutes:
+        return True, latest_trade, round(elapsed_minutes, 2)
+
+    return False, latest_trade, round(elapsed_minutes, 2)
+
+
 def open_paper_position(simulated_entry: dict) -> dict:
     ensure_ledger_files()
+    settings = get_settings()
 
     existing_open = find_open_position_by_market_id(simulated_entry["market_id"])
     if existing_open:
@@ -26,6 +63,19 @@ def open_paper_position(simulated_entry: dict) -> dict:
             "opened": False,
             "reason": "OPEN_POSITION_ALREADY_EXISTS",
             "existing_position": existing_open,
+        }
+
+    in_cooldown, latest_trade, elapsed_minutes = is_market_in_cooldown(
+        market_id=simulated_entry["market_id"],
+        cooldown_minutes=settings.MARKET_COOLDOWN_MINUTES,
+    )
+    if in_cooldown:
+        return {
+            "opened": False,
+            "reason": "MARKET_COOLDOWN_ACTIVE",
+            "latest_trade": latest_trade,
+            "elapsed_minutes": elapsed_minutes,
+            "cooldown_minutes": settings.MARKET_COOLDOWN_MINUTES,
         }
 
     positions = load_positions()
