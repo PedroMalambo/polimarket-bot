@@ -27,6 +27,7 @@ def run_bot_cycle() -> dict:
     app_logger.info(f"MAX_SLIPPAGE_PCT={settings.MAX_SLIPPAGE_PCT}")
     app_logger.info(f"MAX_OPEN_POSITIONS={settings.MAX_OPEN_POSITIONS}")
     app_logger.info(f"MARKET_COOLDOWN_MINUTES={settings.MARKET_COOLDOWN_MINUTES}")
+    app_logger.info(f"MAX_COMMITTED_CAPITAL_USD={settings.MAX_COMMITTED_CAPITAL_USD}")
 
     health = run_polymarket_healthcheck()
     app_logger.info(f"POLYMARKET_HEALTHCHECK_OK={health['ok']}")
@@ -139,6 +140,12 @@ def run_bot_cycle() -> dict:
             f"MAX_OPEN_POSITIONS_REACHED="
             f"open_positions_count={account_state['open_positions_count']} | "
             f"max_open_positions={settings.MAX_OPEN_POSITIONS}"
+        )
+    elif account_state["capital_committed"] >= settings.MAX_COMMITTED_CAPITAL_USD:
+        app_logger.warning(
+            f"MAX_COMMITTED_CAPITAL_REACHED="
+            f"capital_committed={account_state['capital_committed']} | "
+            f"max_committed_capital_usd={settings.MAX_COMMITTED_CAPITAL_USD}"
         )
     elif candidates:
         best_market = candidates[0]

@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     MIN_MARKET_VOLUME_USD: float = Field(default=50000)
     MAX_OPEN_POSITIONS: int = Field(default=3)
     MARKET_COOLDOWN_MINUTES: int = Field(default=60)
+    MAX_COMMITTED_CAPITAL_USD: float = Field(default=12)
 
     TELEGRAM_BOT_TOKEN: str | None = Field(default=None)
     TELEGRAM_CHAT_ID: str | None = Field(default=None)
