@@ -25,6 +25,7 @@ def run_bot_cycle() -> dict:
     app_logger.info(f"MIN_MARKET_VOLUME_USD={settings.MIN_MARKET_VOLUME_USD}")
     app_logger.info(f"MAX_SPREAD={settings.MAX_SPREAD}")
     app_logger.info(f"MAX_SLIPPAGE_PCT={settings.MAX_SLIPPAGE_PCT}")
+    app_logger.info(f"MAX_OPEN_POSITIONS={settings.MAX_OPEN_POSITIONS}")
 
     health = run_polymarket_healthcheck()
     app_logger.info(f"POLYMARKET_HEALTHCHECK_OK={health['ok']}")
@@ -132,6 +133,12 @@ def run_bot_cycle() -> dict:
 
     if kill_switch_triggered:
         app_logger.warning("Kill switch triggered. Skipping new entries.")
+    elif account_state["open_positions_count"] >= settings.MAX_OPEN_POSITIONS:
+        app_logger.warning(
+            f"MAX_OPEN_POSITIONS_REACHED="
+            f"open_positions_count={account_state['open_positions_count']} | "
+            f"max_open_positions={settings.MAX_OPEN_POSITIONS}"
+        )
     elif candidates:
         best_market = candidates[0]
         simulated_entry = simulate_paper_entry(
