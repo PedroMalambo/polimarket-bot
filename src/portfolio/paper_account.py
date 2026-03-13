@@ -11,10 +11,15 @@ def calculate_account_state(initial_capital_usd: float) -> dict:
     closed_positions = [p for p in positions if p.get("status") == "CLOSED"]
 
     total_open_cost = 0.0
+    total_open_market_value = 0.0
+
     for position in open_positions:
         shares = float(position.get("shares", 0.0))
         entry_price = float(position.get("entry_price", 0.0))
+        current_price = float(position.get("current_price", entry_price))
+
         total_open_cost += shares * entry_price
+        total_open_market_value += shares * current_price
 
     realized_pnl = 0.0
     buy_notional = {}
@@ -36,14 +41,17 @@ def calculate_account_state(initial_capital_usd: float) -> dict:
         sell_value = sell_notional.get(position_id, 0.0)
         realized_pnl += sell_value - buy_value
 
+    unrealized_pnl = total_open_market_value - total_open_cost
     cash_available = initial_capital_usd - total_open_cost + realized_pnl
-    equity_estimate = cash_available + total_open_cost
+    equity_estimate = cash_available + total_open_market_value
 
     return {
         "initial_capital_usd": round(initial_capital_usd, 6),
         "cash_available": round(cash_available, 6),
         "capital_committed": round(total_open_cost, 6),
+        "open_market_value": round(total_open_market_value, 6),
         "realized_pnl": round(realized_pnl, 6),
+        "unrealized_pnl": round(unrealized_pnl, 6),
         "equity_estimate": round(equity_estimate, 6),
         "open_positions_count": len(open_positions),
         "closed_positions_count": len(closed_positions),

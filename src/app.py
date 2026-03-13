@@ -58,7 +58,7 @@ def run_bot_cycle() -> dict:
             f"question={market['question']}"
         )
 
-    evaluation_result = evaluate_open_positions(candidates)
+    evaluation_result = evaluate_open_positions(raw_markets)
     app_logger.info(
         f"POSITION_EVALUATION="
         f"closed_positions_count={evaluation_result['closed_positions_count']} | "
@@ -66,7 +66,25 @@ def run_bot_cycle() -> dict:
         f"trades_count={evaluation_result['trades_count']}"
     )
 
-    portfolio_summary = calculate_open_positions_valuation(candidates)
+    for idx, position in enumerate(evaluation_result["closed_positions"], start=1):
+        entry_price = float(position.get("entry_price", 0.0))
+        current_price = float(position.get("current_price", entry_price))
+        shares = float(position.get("shares", 0.0))
+        realized_pnl = round((current_price - entry_price) * shares, 6)
+
+        app_logger.info(
+            f"CLOSED_POSITION_{idx}="
+            f"market_id={position['market_id']} | "
+            f"question={position['question']} | "
+            f"close_reason={position['close_reason']} | "
+            f"entry_price={entry_price} | "
+            f"exit_price={current_price} | "
+            f"shares={shares} | "
+            f"realized_pnl={realized_pnl} | "
+            f"closed_at_utc={position['closed_at_utc']}"
+        )
+
+    portfolio_summary = calculate_open_positions_valuation(raw_markets)
     app_logger.info(
         f"PORTFOLIO_SUMMARY="
         f"open_positions_count={portfolio_summary['open_positions_count']} | "
@@ -100,7 +118,9 @@ def run_bot_cycle() -> dict:
         f"ACCOUNT_STATE="
         f"cash_available={account_state['cash_available']} | "
         f"capital_committed={account_state['capital_committed']} | "
+        f"open_market_value={account_state['open_market_value']} | "
         f"realized_pnl={account_state['realized_pnl']} | "
+        f"unrealized_pnl={account_state['unrealized_pnl']} | "
         f"equity_estimate={account_state['equity_estimate']} | "
         f"open_positions_count={account_state['open_positions_count']} | "
         f"closed_positions_count={account_state['closed_positions_count']}"
