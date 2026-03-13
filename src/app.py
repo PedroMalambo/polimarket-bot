@@ -160,11 +160,31 @@ def run_bot_cycle() -> dict:
                 f"market_id={paper_trade_result['position']['market_id']}"
             )
         else:
-            app_logger.warning(
+            skip_reason = paper_trade_result.get("reason", "UNKNOWN")
+            skip_message = (
                 f"PAPER_POSITION_SKIPPED="
-                f"reason={paper_trade_result['reason']} | "
+                f"reason={skip_reason} | "
                 f"market_id={simulated_entry['market_id']}"
             )
+
+            if skip_reason == "OPEN_POSITION_ALREADY_EXISTS":
+                existing_position = paper_trade_result.get("existing_position", {})
+                skip_message += (
+                    f" | existing_position_id={existing_position.get('position_id')} "
+                    f"| existing_entry_price={existing_position.get('entry_price')} "
+                    f"| existing_current_price={existing_position.get('current_price')} "
+                    f"| existing_opened_at_utc={existing_position.get('opened_at_utc')}"
+                )
+            elif skip_reason == "MARKET_COOLDOWN_ACTIVE":
+                latest_trade = paper_trade_result.get("latest_trade", {})
+                skip_message += (
+                    f" | cooldown_minutes={paper_trade_result.get('cooldown_minutes')} "
+                    f"| elapsed_minutes={paper_trade_result.get('elapsed_minutes')} "
+                    f"| latest_trade_action={latest_trade.get('action')} "
+                    f"| latest_trade_timestamp_utc={latest_trade.get('timestamp_utc')}"
+                )
+
+            app_logger.warning(skip_message)
     else:
         app_logger.warning("No candidate markets found. Skipping paper entry simulation.")
 
