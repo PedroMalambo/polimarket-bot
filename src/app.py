@@ -183,17 +183,34 @@ def run_bot_cycle() -> dict:
 
     if kill_switch_triggered:
         app_logger.warning("Kill switch triggered. Skipping new entries.")
+        send_telegram_message(
+            "🛑 KILL SWITCH TRIGGERED\n"
+            f"Equity Estimate: {account_state['equity_estimate']}\n"
+            f"Kill Switch USD: {settings.KILL_SWITCH_USD}\n"
+            f"Open Positions: {account_state['open_positions_count']}\n"
+            f"Closed Positions: {account_state['closed_positions_count']}"
+        )
     elif account_state["open_positions_count"] >= settings.MAX_OPEN_POSITIONS:
         app_logger.warning(
             f"MAX_OPEN_POSITIONS_REACHED="
             f"open_positions_count={account_state['open_positions_count']} | "
             f"max_open_positions={settings.MAX_OPEN_POSITIONS}"
         )
+        send_telegram_message(
+            "🟠 MAX OPEN POSITIONS REACHED\n"
+            f"Open Positions: {account_state['open_positions_count']}\n"
+            f"Max Allowed: {settings.MAX_OPEN_POSITIONS}"
+        )
     elif account_state["capital_committed"] >= settings.MAX_COMMITTED_CAPITAL_USD:
         app_logger.warning(
             f"MAX_COMMITTED_CAPITAL_REACHED="
             f"capital_committed={account_state['capital_committed']} | "
             f"max_committed_capital_usd={settings.MAX_COMMITTED_CAPITAL_USD}"
+        )
+        send_telegram_message(
+            "🟠 MAX COMMITTED CAPITAL REACHED\n"
+            f"Capital Committed: {account_state['capital_committed']}\n"
+            f"Max Allowed USD: {settings.MAX_COMMITTED_CAPITAL_USD}"
         )
     elif candidates:
         best_market = candidates[0]
@@ -241,6 +258,15 @@ def run_bot_cycle() -> dict:
                     f"| existing_current_price={existing_position.get('current_price')} "
                     f"| existing_opened_at_utc={existing_position.get('opened_at_utc')}"
                 )
+
+                send_telegram_message(
+                    "🟡 PAPER POSITION SKIPPED\n"
+                    f"Reason: {skip_reason}\n"
+                    f"Market: {simulated_entry['market_id']}\n"
+                    f"Existing Position ID: {existing_position.get('position_id')}\n"
+                    f"Existing Entry: {existing_position.get('entry_price')}\n"
+                    f"Existing Current: {existing_position.get('current_price')}"
+                )
             elif skip_reason == "MARKET_COOLDOWN_ACTIVE":
                 latest_trade = paper_trade_result.get("latest_trade", {})
                 skip_message += (
@@ -248,6 +274,15 @@ def run_bot_cycle() -> dict:
                     f"| elapsed_minutes={paper_trade_result.get('elapsed_minutes')} "
                     f"| latest_trade_action={latest_trade.get('action')} "
                     f"| latest_trade_timestamp_utc={latest_trade.get('timestamp_utc')}"
+                )
+
+                send_telegram_message(
+                    "🟡 PAPER POSITION SKIPPED\n"
+                    f"Reason: {skip_reason}\n"
+                    f"Market: {simulated_entry['market_id']}\n"
+                    f"Cooldown Minutes: {paper_trade_result.get('cooldown_minutes')}\n"
+                    f"Elapsed Minutes: {paper_trade_result.get('elapsed_minutes')}\n"
+                    f"Latest Trade Action: {latest_trade.get('action')}"
                 )
 
             app_logger.warning(skip_message)
