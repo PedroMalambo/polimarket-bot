@@ -1,4 +1,5 @@
 from functools import lru_cache
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -40,6 +41,11 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str | None = Field(default=None)
     TELEGRAM_CHAT_ID: str | None = Field(default=None)
     DISCORD_WEBHOOK_URL: str | None = Field(default=None)
+
+    TRADING_MODE: str = Field(default="paper")
+    LIVE_TRADING_ENABLED: bool = Field(default=False)
+    MAX_LIVE_ORDER_USD: float = Field(default=2.0)
+    ALLOWED_LIVE_MARKET_IDS: str = Field(default="")
 
 
 @lru_cache

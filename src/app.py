@@ -4,6 +4,7 @@ from src.clients.polymarket_client import PolymarketClient
 from src.config.settings import get_settings
 from src.execution.paper_entry import simulate_paper_entry
 from src.execution.paper_trader import evaluate_open_positions, open_paper_position
+from src.live.execution_guard import evaluate_live_execution_guard
 from src.monitoring.logger import app_logger
 from src.monitoring.telegram_notifier import send_telegram_message
 from src.portfolio.paper_account import calculate_account_state, is_kill_switch_triggered
@@ -180,6 +181,7 @@ def run_bot_cycle() -> dict:
 
     simulated_entry = None
     paper_trade_result = None
+    live_guard_result = None
 
     if kill_switch_triggered:
         app_logger.warning("Kill switch triggered. Skipping new entries.")
@@ -221,71 +223,100 @@ def run_bot_cycle() -> dict:
         )
         app_logger.info(f"SIMULATED_ENTRY={simulated_entry}")
 
-        paper_trade_result = open_paper_position(simulated_entry)
+        if settings.TRADING_MODE == "live":
+            live_guard_result = evaluate_live_execution_guard(simulated_entry)
+            app_logger.info(f"LIVE_GUARD_RESULT={live_guard_result}")
 
-        if paper_trade_result.get("opened"):
-            app_logger.info(
-                f"PAPER_POSITION_OPENED="
-                f"positions_count={paper_trade_result['positions_count']} | "
-                f"trades_count={paper_trade_result['trades_count']} | "
-                f"position_id={paper_trade_result['position']['position_id']} | "
-                f"market_id={paper_trade_result['position']['market_id']}"
-            )
-
-            opened_position = paper_trade_result["position"]
-            send_telegram_message(
-                "🟢 PAPER POSITION OPENED\n"
-                f"Market: {opened_position['market_id']}\n"
-                f"Question: {opened_position['question']}\n"
-                f"Entry: {opened_position['entry_price']}\n"
-                f"Shares: {opened_position['shares']}\n"
-                f"Stop Loss: {opened_position['stop_loss_price']}\n"
-                f"Take Profit: {opened_position['take_profit_price']}"
-            )
+            if live_guard_result.get("allowed"):
+                app_logger.warning(
+                    "LIVE_EXECUTION_NOT_IMPLEMENTED="
+                    f"market_id={simulated_entry['market_id']} | "
+                    f"risk_amount_usd={simulated_entry.get('risk_amount_usd')}"
+                )
+                send_telegram_message(
+                    "🟣 LIVE EXECUTION AUTHORIZED\n"
+                    f"Market: {simulated_entry['market_id']}\n"
+                    f"Risk Amount USD: {simulated_entry.get('risk_amount_usd')}\n"
+                    "Live order placement is not implemented yet."
+                )
+            else:
+                app_logger.warning(
+                    "LIVE_EXECUTION_BLOCKED="
+                    f"reason={live_guard_result.get('reason')} | "
+                    f"market_id={simulated_entry['market_id']} | "
+                    f"details={live_guard_result.get('details')}"
+                )
+                send_telegram_message(
+                    "🛑 LIVE EXECUTION BLOCKED\n"
+                    f"Reason: {live_guard_result.get('reason')}\n"
+                    f"Market: {simulated_entry['market_id']}"
+                )
         else:
-            skip_reason = paper_trade_result.get("reason", "UNKNOWN")
-            skip_message = (
-                f"PAPER_POSITION_SKIPPED="
-                f"reason={skip_reason} | "
-                f"market_id={simulated_entry['market_id']}"
-            )
+            paper_trade_result = open_paper_position(simulated_entry)
 
-            if skip_reason == "OPEN_POSITION_ALREADY_EXISTS":
-                existing_position = paper_trade_result.get("existing_position", {})
-                skip_message += (
-                    f" | existing_position_id={existing_position.get('position_id')} "
-                    f"| existing_entry_price={existing_position.get('entry_price')} "
-                    f"| existing_current_price={existing_position.get('current_price')} "
-                    f"| existing_opened_at_utc={existing_position.get('opened_at_utc')}"
+            if paper_trade_result.get("opened"):
+                app_logger.info(
+                    f"PAPER_POSITION_OPENED="
+                    f"positions_count={paper_trade_result['positions_count']} | "
+                    f"trades_count={paper_trade_result['trades_count']} | "
+                    f"position_id={paper_trade_result['position']['position_id']} | "
+                    f"market_id={paper_trade_result['position']['market_id']}"
                 )
 
+                opened_position = paper_trade_result["position"]
                 send_telegram_message(
-                    "🟡 PAPER POSITION SKIPPED\n"
-                    f"Reason: {skip_reason}\n"
-                    f"Market: {simulated_entry['market_id']}\n"
-                    f"Existing Position ID: {existing_position.get('position_id')}\n"
-                    f"Existing Entry: {existing_position.get('entry_price')}\n"
-                    f"Existing Current: {existing_position.get('current_price')}"
+                    "🟢 PAPER POSITION OPENED\n"
+                    f"Market: {opened_position['market_id']}\n"
+                    f"Question: {opened_position['question']}\n"
+                    f"Entry: {opened_position['entry_price']}\n"
+                    f"Shares: {opened_position['shares']}\n"
+                    f"Stop Loss: {opened_position['stop_loss_price']}\n"
+                    f"Take Profit: {opened_position['take_profit_price']}"
                 )
-            elif skip_reason == "MARKET_COOLDOWN_ACTIVE":
-                latest_trade = paper_trade_result.get("latest_trade", {})
-                skip_message += (
-                    f" | cooldown_minutes={paper_trade_result.get('cooldown_minutes')} "
-                    f"| elapsed_minutes={paper_trade_result.get('elapsed_minutes')} "
-                    f"| latest_trade_action={latest_trade.get('action')} "
-                    f"| latest_trade_timestamp_utc={latest_trade.get('timestamp_utc')}"
-                )
-
-                send_telegram_message(
-                    "🟡 PAPER POSITION SKIPPED\n"
-                    f"Reason: {skip_reason}\n"
-                    f"Market: {simulated_entry['market_id']}\n"
-                    f"Cooldown Minutes: {paper_trade_result.get('cooldown_minutes')}\n"
-                    f"Elapsed Minutes: {paper_trade_result.get('elapsed_minutes')}\n"
-                    f"Latest Trade Action: {latest_trade.get('action')}"
+            else:
+                skip_reason = paper_trade_result.get("reason", "UNKNOWN")
+                skip_message = (
+                    f"PAPER_POSITION_SKIPPED="
+                    f"reason={skip_reason} | "
+                    f"market_id={simulated_entry['market_id']}"
                 )
 
-            app_logger.warning(skip_message)
+                if skip_reason == "OPEN_POSITION_ALREADY_EXISTS":
+                    existing_position = paper_trade_result.get("existing_position", {})
+                    skip_message += (
+                        f" | existing_position_id={existing_position.get('position_id')} "
+                        f"| existing_entry_price={existing_position.get('entry_price')} "
+                        f"| existing_current_price={existing_position.get('current_price')} "
+                        f"| existing_opened_at_utc={existing_position.get('opened_at_utc')}"
+                    )
+
+                    send_telegram_message(
+                        "🟡 PAPER POSITION SKIPPED\n"
+                        f"Reason: {skip_reason}\n"
+                        f"Market: {simulated_entry['market_id']}\n"
+                        f"Existing Position ID: {existing_position.get('position_id')}\n"
+                        f"Existing Entry: {existing_position.get('entry_price')}\n"
+                        f"Existing Current: {existing_position.get('current_price')}"
+                    )
+                elif skip_reason == "MARKET_COOLDOWN_ACTIVE":
+                    latest_trade = paper_trade_result.get("latest_trade", {})
+                    skip_message += (
+                        f" | cooldown_minutes={paper_trade_result.get('cooldown_minutes')} "
+                        f"| elapsed_minutes={paper_trade_result.get('elapsed_minutes')} "
+                        f"| latest_trade_action={latest_trade.get('action')} "
+                        f"| latest_trade_timestamp_utc={latest_trade.get('timestamp_utc')}"
+                    )
+
+                    send_telegram_message(
+                        "🟡 PAPER POSITION SKIPPED\n"
+                        f"Reason: {skip_reason}\n"
+                        f"Market: {simulated_entry['market_id']}\n"
+                        f"Cooldown Minutes: {paper_trade_result.get('cooldown_minutes')}\n"
+                        f"Elapsed Minutes: {paper_trade_result.get('elapsed_minutes')}\n"
+                        f"Latest Trade Action: {latest_trade.get('action')}"
+                    )
+
+                app_logger.warning(skip_message)
     else:
         app_logger.warning("No candidate markets found. Skipping paper entry simulation.")
 
@@ -310,6 +341,7 @@ def run_bot_cycle() -> dict:
         "kill_switch_triggered": kill_switch_triggered,
         "simulated_entry": simulated_entry,
         "paper_trade_result": paper_trade_result,
+        "live_guard_result": live_guard_result,
     }
 
     snapshot_path = write_snapshot(snapshot_payload)

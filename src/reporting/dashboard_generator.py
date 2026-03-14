@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import json
 import subprocess
+from datetime import datetime
 from pathlib import Path
 
 from src.config.settings import get_settings
@@ -37,13 +38,47 @@ def format_float(value: object) -> str:
         return "-"
 
 
+def format_timestamp(value: object) -> str:
+    if not value:
+        return "-"
+    try:
+        dt = datetime.fromisoformat(str(value))
+        return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+    except Exception:
+        return str(value)
+
+
+def pnl_class(value: object) -> str:
+    try:
+        numeric = float(value)
+    except Exception:
+        return "neutral"
+
+    if numeric > 0:
+        return "positive"
+    if numeric < 0:
+        return "negative"
+    return "neutral"
+
+
+def render_cell(col: object, class_name: str = "") -> str:
+    class_attr = f' class="{class_name}"' if class_name else ""
+    return f"<td{class_attr}>{html.escape(str(col))}</td>"
+
+
 def render_table(headers: list[str], rows: list[list[object]]) -> str:
     thead = "".join(f"<th>{html.escape(str(h))}</th>" for h in headers)
 
     body_rows = []
     for row in rows:
-        cols = "".join(f"<td>{html.escape(str(col))}</td>" for col in row)
-        body_rows.append(f"<tr>{cols}</tr>")
+        cols = []
+        for col in row:
+            if isinstance(col, tuple) and len(col) == 2:
+                value, cls = col
+                cols.append(render_cell(value, cls))
+            else:
+                cols.append(render_cell(col))
+        body_rows.append(f"<tr>{''.join(cols)}</tr>")
 
     tbody = "".join(body_rows) if body_rows else f'<tr><td colspan="{len(headers)}">No data</td></tr>'
     return f"<table><thead><tr>{thead}</tr></thead><tbody>{tbody}</tbody></table>"
@@ -59,7 +94,7 @@ def build_equity_svg(snapshots: list[dict]) -> str:
         if equity is None:
             continue
         try:
-            points.append((timestamp, float(equity)))
+            points.append((str(timestamp), float(equity)))
         except Exception:
             continue
 
@@ -157,6 +192,15 @@ def build_status_badge(label: str, value: str) -> str:
     """
 
 
+def build_empty_candidates_notice() -> str:
+    return """
+    <div class="empty-state">
+        <div class="empty-title">No candidate markets in latest snapshot</div>
+        <div class="empty-text">The bot did not find qualifying markets for the most recent cycle.</div>
+    </div>
+    """
+
+
 def build_dashboard_html() -> str:
     settings = get_settings()
     positions = load_positions()
@@ -183,7 +227,7 @@ def build_dashboard_html() -> str:
         snapshot_rows.append(
             [
                 snapshot.get("_file_name", "-"),
-                snapshot.get("timestamp_utc", "-"),
+                format_timestamp(snapshot.get("timestamp_utc", "-")),
                 snapshot.get("candidate_markets_count", "-"),
                 account.get("equity_estimate", "-"),
                 account.get("cash_available", "-"),
@@ -202,7 +246,7 @@ def build_dashboard_html() -> str:
                 position.get("shares", "-"),
                 position.get("stop_loss_price", "-"),
                 position.get("take_profit_price", "-"),
-                position.get("opened_at_utc", "-"),
+                format_timestamp(position.get("opened_at_utc", "-")),
             ]
         )
 
@@ -221,21 +265,22 @@ def build_dashboard_html() -> str:
                 position.get("entry_price", "-"),
                 position.get("current_price", "-"),
                 position.get("shares", "-"),
-                realized_pnl,
-                position.get("closed_at_utc", "-"),
+                (realized_pnl, pnl_class(realized_pnl)),
+                format_timestamp(position.get("closed_at_utc", "-")),
             ]
         )
 
     trade_rows = []
     for trade in recent_trades:
+        notional = trade.get("notional_usd", "-")
         trade_rows.append(
             [
-                trade.get("timestamp_utc", "-"),
+                format_timestamp(trade.get("timestamp_utc", "-")),
                 trade.get("market_id", "-"),
                 trade.get("action", "-"),
                 trade.get("price", "-"),
                 trade.get("shares", "-"),
-                trade.get("notional_usd", "-"),
+                notional,
             ]
         )
 
@@ -327,9 +372,13 @@ def build_dashboard_html() -> str:
         trade_rows,
     )
 
-    candidate_table = render_table(
-        ["Market ID", "Question", "Score", "Yes Price", "Spread", "Volume", "Liquidity"],
-        candidate_rows,
+    candidate_table = (
+        render_table(
+            ["Market ID", "Question", "Score", "Yes Price", "Spread", "Volume", "Liquidity"],
+            candidate_rows,
+        )
+        if candidate_rows
+        else build_empty_candidates_notice()
     )
 
     recent_snapshots_table = render_table(
@@ -337,11 +386,14 @@ def build_dashboard_html() -> str:
         snapshot_rows,
     )
 
+    generated_at = format_timestamp(datetime.utcnow().isoformat())
+
     return f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="30">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Polymarket Bot Dashboard</title>
     <style>
@@ -370,7 +422,7 @@ def build_dashboard_html() -> str:
             gap: 16px;
             margin-bottom: 28px;
         }}
-        .card, .status-card {{
+        .card, .status-card, .empty-state {{
             background: #111827;
             border: 1px solid #1f2937;
             border-radius: 12px;
@@ -393,6 +445,14 @@ def build_dashboard_html() -> str:
             align-items: center;
             gap: 10px;
         }}
+        .empty-title {{
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }}
+        .empty-text {{
+            color: #94a3b8;
+        }}
         .dot {{
             width: 12px;
             height: 12px;
@@ -407,6 +467,18 @@ def build_dashboard_html() -> str:
         }}
         .dot-amber {{
             background: #f59e0b;
+        }}
+        .positive {{
+            color: #22c55e;
+            font-weight: bold;
+        }}
+        .negative {{
+            color: #ef4444;
+            font-weight: bold;
+        }}
+        .neutral {{
+            color: #cbd5e1;
+            font-weight: bold;
         }}
         .chart {{
             width: 100%;
@@ -436,7 +508,7 @@ def build_dashboard_html() -> str:
 </head>
 <body>
     <h1>Polymarket Bot Dashboard</h1>
-    <div class="muted">Generated from local bot data and snapshots.</div>
+    <div class="muted">Generated from local bot data and snapshots. Last refresh: {html.escape(generated_at)}</div>
 
     <h2>Operational Status</h2>
     <div class="status-grid">{status_html}</div>
