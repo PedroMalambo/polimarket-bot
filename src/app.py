@@ -10,6 +10,7 @@ from src.monitoring.telegram_notifier import send_telegram_message
 from src.portfolio.paper_account import calculate_account_state, is_kill_switch_triggered
 from src.portfolio.portfolio_valuation import calculate_open_positions_valuation
 from src.strategy.market_selector import filter_candidate_markets
+from src.strategy.openclaw_decider import decide_market_with_openclaw
 from src.utils.healthcheck import run_polymarket_healthcheck
 from src.utils.snapshot_store import write_snapshot
 
@@ -215,108 +216,172 @@ def run_bot_cycle() -> dict:
             f"Max Allowed USD: {settings.MAX_COMMITTED_CAPITAL_USD}"
         )
     elif candidates:
-        best_market = candidates[0]
-        simulated_entry = simulate_paper_entry(
-            market=best_market,
-            current_capital=account_state["equity_estimate"],
-            max_slippage_pct=settings.MAX_SLIPPAGE_PCT,
+        openclaw_decision_result = decide_market_with_openclaw(
+            candidates=candidates[:5],
+            account_state=account_state,
+            trading_mode=settings.TRADING_MODE,
+            max_open_positions=settings.MAX_OPEN_POSITIONS,
+            max_committed_capital_usd=settings.MAX_COMMITTED_CAPITAL_USD,
+            max_live_order_usd=settings.MAX_LIVE_ORDER_USD,
         )
-        app_logger.info(f"SIMULATED_ENTRY={simulated_entry}")
+        app_logger.info(f"OPENCLAW_DECISION_RESULT={openclaw_decision_result}")
 
-        if settings.TRADING_MODE == "live":
-            live_guard_result = evaluate_live_execution_guard(simulated_entry)
-            app_logger.info(f"LIVE_GUARD_RESULT={live_guard_result}")
+        selected_market = None
 
-            if live_guard_result.get("allowed"):
-                app_logger.warning(
-                    "LIVE_EXECUTION_NOT_IMPLEMENTED="
-                    f"market_id={simulated_entry['market_id']} | "
-                    f"risk_amount_usd={simulated_entry.get('risk_amount_usd')}"
+        if openclaw_decision_result.get("ok"):
+            decision = openclaw_decision_result.get("decision") or {}
+            decision_action = str(decision.get("action", "")).upper()
+            decision_market_id = str(decision.get("market_id", "")).strip()
+
+            if decision_action == "BUY" and decision_market_id:
+                selected_market = next(
+                    (market for market in candidates if str(market.get("id")) == decision_market_id),
+                    None,
                 )
-                send_telegram_message(
-                    "🟣 LIVE EXECUTION AUTHORIZED\n"
-                    f"Market: {simulated_entry['market_id']}\n"
-                    f"Risk Amount USD: {simulated_entry.get('risk_amount_usd')}\n"
-                    "Live order placement is not implemented yet."
-                )
+
+                if selected_market is not None:
+                    app_logger.info(
+                        "OPENCLAW_MARKET_SELECTED="
+                        f"market_id={decision_market_id} | "
+                        f"confidence={decision.get('confidence')} | "
+                        f"reason={decision.get('reason')} | "
+                        f"max_order_usd={decision.get('max_order_usd')}"
+                    )
+                else:
+                    app_logger.warning(
+                        "OPENCLAW_MARKET_ID_NOT_FOUND_IN_CANDIDATES="
+                        f"market_id={decision_market_id}"
+                    )
             else:
                 app_logger.warning(
-                    "LIVE_EXECUTION_BLOCKED="
-                    f"reason={live_guard_result.get('reason')} | "
-                    f"market_id={simulated_entry['market_id']} | "
-                    f"details={live_guard_result.get('details')}"
+                    "OPENCLAW_DECISION_SKIP="
+                    f"action={decision_action} | "
+                    f"reason={decision.get('reason')} | "
+                    f"confidence={decision.get('confidence')}"
                 )
                 send_telegram_message(
-                    "🛑 LIVE EXECUTION BLOCKED\n"
-                    f"Reason: {live_guard_result.get('reason')}\n"
-                    f"Market: {simulated_entry['market_id']}"
+                    "🔵 OPENCLAW DECISION: SKIP\n"
+                    f"Reason: {decision.get('reason')}\n"
+                    f"Confidence: {decision.get('confidence')}"
                 )
         else:
-            paper_trade_result = open_paper_position(simulated_entry)
+            app_logger.warning(
+                "OPENCLAW_DECISION_FAILED="
+                f"error={openclaw_decision_result.get('error')} | "
+                f"assistant_text={openclaw_decision_result.get('assistant_text')}"
+            )
 
-            if paper_trade_result.get("opened"):
-                app_logger.info(
-                    f"PAPER_POSITION_OPENED="
-                    f"positions_count={paper_trade_result['positions_count']} | "
-                    f"trades_count={paper_trade_result['trades_count']} | "
-                    f"position_id={paper_trade_result['position']['position_id']} | "
-                    f"market_id={paper_trade_result['position']['market_id']}"
-                )
+        if selected_market is None and openclaw_decision_result.get("ok") is not True:
+            selected_market = candidates[0]
+            app_logger.warning(
+                "OPENCLAW_FALLBACK_TO_TOP_CANDIDATE="
+                f"market_id={selected_market['id']}"
+            )
 
-                opened_position = paper_trade_result["position"]
-                send_telegram_message(
-                    "🟢 PAPER POSITION OPENED\n"
-                    f"Market: {opened_position['market_id']}\n"
-                    f"Question: {opened_position['question']}\n"
-                    f"Entry: {opened_position['entry_price']}\n"
-                    f"Shares: {opened_position['shares']}\n"
-                    f"Stop Loss: {opened_position['stop_loss_price']}\n"
-                    f"Take Profit: {opened_position['take_profit_price']}"
-                )
+        if selected_market is None:
+            app_logger.warning("No market selected after OpenClaw decision. Skipping entry.")
+        else:
+            simulated_entry = simulate_paper_entry(
+                market=selected_market,
+                current_capital=account_state["equity_estimate"],
+                max_slippage_pct=settings.MAX_SLIPPAGE_PCT,
+            )
+            app_logger.info(f"SIMULATED_ENTRY={simulated_entry}")
+
+            if settings.TRADING_MODE == "live":
+                live_guard_result = evaluate_live_execution_guard(simulated_entry)
+                app_logger.info(f"LIVE_GUARD_RESULT={live_guard_result}")
+
+                if live_guard_result.get("allowed"):
+                    app_logger.warning(
+                        "LIVE_EXECUTION_NOT_IMPLEMENTED="
+                        f"market_id={simulated_entry['market_id']} | "
+                        f"risk_amount_usd={simulated_entry.get('risk_amount_usd')}"
+                    )
+                    send_telegram_message(
+                        "🟣 LIVE EXECUTION AUTHORIZED\n"
+                        f"Market: {simulated_entry['market_id']}\n"
+                        f"Risk Amount USD: {simulated_entry.get('risk_amount_usd')}\n"
+                        "Live order placement is not implemented yet."
+                    )
+                else:
+                    app_logger.warning(
+                        "LIVE_EXECUTION_BLOCKED="
+                        f"reason={live_guard_result.get('reason')} | "
+                        f"market_id={simulated_entry['market_id']} | "
+                        f"details={live_guard_result.get('details')}"
+                    )
+                    send_telegram_message(
+                        "🛑 LIVE EXECUTION BLOCKED\n"
+                        f"Reason: {live_guard_result.get('reason')}\n"
+                        f"Market: {simulated_entry['market_id']}"
+                    )
             else:
-                skip_reason = paper_trade_result.get("reason", "UNKNOWN")
-                skip_message = (
-                    f"PAPER_POSITION_SKIPPED="
-                    f"reason={skip_reason} | "
-                    f"market_id={simulated_entry['market_id']}"
-                )
+                paper_trade_result = open_paper_position(simulated_entry)
 
-                if skip_reason == "OPEN_POSITION_ALREADY_EXISTS":
-                    existing_position = paper_trade_result.get("existing_position", {})
-                    skip_message += (
-                        f" | existing_position_id={existing_position.get('position_id')} "
-                        f"| existing_entry_price={existing_position.get('entry_price')} "
-                        f"| existing_current_price={existing_position.get('current_price')} "
-                        f"| existing_opened_at_utc={existing_position.get('opened_at_utc')}"
+                if paper_trade_result.get("opened"):
+                    app_logger.info(
+                        f"PAPER_POSITION_OPENED="
+                        f"positions_count={paper_trade_result['positions_count']} | "
+                        f"trades_count={paper_trade_result['trades_count']} | "
+                        f"position_id={paper_trade_result['position']['position_id']} | "
+                        f"market_id={paper_trade_result['position']['market_id']}"
                     )
 
+                    opened_position = paper_trade_result["position"]
                     send_telegram_message(
-                        "🟡 PAPER POSITION SKIPPED\n"
-                        f"Reason: {skip_reason}\n"
-                        f"Market: {simulated_entry['market_id']}\n"
-                        f"Existing Position ID: {existing_position.get('position_id')}\n"
-                        f"Existing Entry: {existing_position.get('entry_price')}\n"
-                        f"Existing Current: {existing_position.get('current_price')}"
+                        "🟢 PAPER POSITION OPENED\n"
+                        f"Market: {opened_position['market_id']}\n"
+                        f"Question: {opened_position['question']}\n"
+                        f"Entry: {opened_position['entry_price']}\n"
+                        f"Shares: {opened_position['shares']}\n"
+                        f"Stop Loss: {opened_position['stop_loss_price']}\n"
+                        f"Take Profit: {opened_position['take_profit_price']}"
                     )
-                elif skip_reason == "MARKET_COOLDOWN_ACTIVE":
-                    latest_trade = paper_trade_result.get("latest_trade", {})
-                    skip_message += (
-                        f" | cooldown_minutes={paper_trade_result.get('cooldown_minutes')} "
-                        f"| elapsed_minutes={paper_trade_result.get('elapsed_minutes')} "
-                        f"| latest_trade_action={latest_trade.get('action')} "
-                        f"| latest_trade_timestamp_utc={latest_trade.get('timestamp_utc')}"
-                    )
-
-                    send_telegram_message(
-                        "🟡 PAPER POSITION SKIPPED\n"
-                        f"Reason: {skip_reason}\n"
-                        f"Market: {simulated_entry['market_id']}\n"
-                        f"Cooldown Minutes: {paper_trade_result.get('cooldown_minutes')}\n"
-                        f"Elapsed Minutes: {paper_trade_result.get('elapsed_minutes')}\n"
-                        f"Latest Trade Action: {latest_trade.get('action')}"
+                else:
+                    skip_reason = paper_trade_result.get("reason", "UNKNOWN")
+                    skip_message = (
+                        f"PAPER_POSITION_SKIPPED="
+                        f"reason={skip_reason} | "
+                        f"market_id={simulated_entry['market_id']}"
                     )
 
-                app_logger.warning(skip_message)
+                    if skip_reason == "OPEN_POSITION_ALREADY_EXISTS":
+                        existing_position = paper_trade_result.get("existing_position", {})
+                        skip_message += (
+                            f" | existing_position_id={existing_position.get('position_id')} "
+                            f"| existing_entry_price={existing_position.get('entry_price')} "
+                            f"| existing_current_price={existing_position.get('current_price')} "
+                            f"| existing_opened_at_utc={existing_position.get('opened_at_utc')}"
+                        )
+
+                        send_telegram_message(
+                            "🟡 PAPER POSITION SKIPPED\n"
+                            f"Reason: {skip_reason}\n"
+                            f"Market: {simulated_entry['market_id']}\n"
+                            f"Existing Position ID: {existing_position.get('position_id')}\n"
+                            f"Existing Entry: {existing_position.get('entry_price')}\n"
+                            f"Existing Current: {existing_position.get('current_price')}"
+                        )
+                    elif skip_reason == "MARKET_COOLDOWN_ACTIVE":
+                        latest_trade = paper_trade_result.get("latest_trade", {})
+                        skip_message += (
+                            f" | cooldown_minutes={paper_trade_result.get('cooldown_minutes')} "
+                            f"| elapsed_minutes={paper_trade_result.get('elapsed_minutes')} "
+                            f"| latest_trade_action={latest_trade.get('action')} "
+                            f"| latest_trade_timestamp_utc={latest_trade.get('timestamp_utc')}"
+                        )
+
+                        send_telegram_message(
+                            "🟡 PAPER POSITION SKIPPED\n"
+                            f"Reason: {skip_reason}\n"
+                            f"Market: {simulated_entry['market_id']}\n"
+                            f"Cooldown Minutes: {paper_trade_result.get('cooldown_minutes')}\n"
+                            f"Elapsed Minutes: {paper_trade_result.get('elapsed_minutes')}\n"
+                            f"Latest Trade Action: {latest_trade.get('action')}"
+                        )
+
+                    app_logger.warning(skip_message)
     else:
         app_logger.warning("No candidate markets found. Skipping paper entry simulation.")
 

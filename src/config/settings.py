@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str | None = Field(default=None)
     OPENCLAW_GATEWAY_URL: str = Field(default="http://127.0.0.1:18789")
+    OPENCLAW_GATEWAY_TOKEN: str | None = Field(default=None)
 
     POLYMARKET_API_BASE: str = Field(default="https://gamma-api.polymarket.com")
     POLYMARKET_CLOB_BASE: str = Field(default="https://clob.polymarket.com")
