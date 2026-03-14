@@ -1,3 +1,4 @@
+from src.strategy.exposure_manager import filter_candidates_by_exposure
 from datetime import datetime, UTC
 
 from src.clients.polymarket_client import PolymarketClient
@@ -147,6 +148,33 @@ def run_bot_cycle() -> dict:
             f"elapsed_minutes={elapsed_minutes} | "
             f"last_action={(latest_trade or {}).get('action')}"
         )
+
+    # --- FILTRO DE EXPOSICIÓN SEMÁNTICA (ANTI-CONCENTRACIÓN) ---
+    candidates_before_exposure_filter_count = len(candidates)
+    
+    # Extraemos las preguntas de las posiciones actualmente abiertas
+    current_positions = load_positions()
+    open_questions = [p.get("question", "") for p in current_positions if p.get("status") == "OPEN" and p.get("question")]
+
+    # Aplicamos nuestro nuevo filtro
+    candidates, excluded_exposure_details = filter_candidates_by_exposure(
+        candidates=candidates,
+        open_questions=open_questions,
+        threshold=0.45
+    )
+
+    app_logger.info(f"EXPOSURE_FILTER_PRE_COUNT={candidates_before_exposure_filter_count}")
+    app_logger.info(f"EXPOSURE_FILTER_EXCLUDED_COUNT={len(excluded_exposure_details)}")
+    
+    for detail in excluded_exposure_details:
+        app_logger.info(
+            "EXPOSURE_CANDIDATE_EXCLUDED="
+            f"market_id={detail['market_id']} | "
+            f"question={detail['question']} | "
+            f"reason={detail['reason']}"
+        )
+    # -----------------------------------------------------------
+
     app_logger.info(f"CANDIDATE_MARKETS_COUNT={len(candidates)}")
 
     for idx, market in enumerate(candidates[:10], start=1):
