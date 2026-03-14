@@ -3,7 +3,7 @@ from datetime import datetime, UTC
 from src.clients.polymarket_client import PolymarketClient
 from src.config.settings import get_settings
 from src.execution.paper_entry import simulate_paper_entry
-from src.execution.paper_trader import evaluate_open_positions, open_paper_position
+from src.execution.paper_trader import evaluate_open_positions, is_market_in_cooldown, open_paper_position
 from src.live.execution_guard import evaluate_live_execution_guard
 from src.monitoring.logger import app_logger
 from src.monitoring.telegram_notifier import send_telegram_message
@@ -102,6 +102,24 @@ def run_bot_cycle() -> dict:
     ]
     excluded_open_market_candidates_count = len(excluded_open_market_candidates)
 
+    candidates_before_cooldown_filter_count = len(candidates)
+    excluded_cooldown_candidates: list[tuple[dict, float | None, dict | None]] = []
+
+    filtered_candidates = []
+    for market in candidates:
+        market_id = str(market.get("id"))
+        in_cooldown, latest_trade, elapsed_minutes = is_market_in_cooldown(
+            market_id=market_id,
+            cooldown_minutes=settings.MARKET_COOLDOWN_MINUTES,
+        )
+        if in_cooldown:
+            excluded_cooldown_candidates.append((market, elapsed_minutes, latest_trade))
+            continue
+        filtered_candidates.append(market)
+
+    candidates = filtered_candidates
+    excluded_cooldown_candidates_count = len(excluded_cooldown_candidates)
+
     app_logger.info(f"RAW_MARKETS_COUNT={len(raw_markets)}")
     app_logger.info(
         f"CANDIDATE_MARKETS_PRE_OPEN_FILTER_COUNT={candidates_before_open_filter_count}"
@@ -114,6 +132,20 @@ def run_bot_cycle() -> dict:
             "OPEN_MARKET_CANDIDATE_EXCLUDED="
             f"market_id={excluded_market.get('id')} | "
             f"question={excluded_market.get('question')}"
+        )
+    app_logger.info(
+        f"CANDIDATE_MARKETS_PRE_COOLDOWN_FILTER_COUNT={candidates_before_cooldown_filter_count}"
+    )
+    app_logger.info(
+        f"COOLDOWN_CANDIDATES_EXCLUDED_COUNT={excluded_cooldown_candidates_count}"
+    )
+    for excluded_market, elapsed_minutes, latest_trade in excluded_cooldown_candidates:
+        app_logger.info(
+            "COOLDOWN_CANDIDATE_EXCLUDED="
+            f"market_id={excluded_market.get('id')} | "
+            f"question={excluded_market.get('question')} | "
+            f"elapsed_minutes={elapsed_minutes} | "
+            f"last_action={(latest_trade or {}).get('action')}"
         )
     app_logger.info(f"CANDIDATE_MARKETS_COUNT={len(candidates)}")
 
