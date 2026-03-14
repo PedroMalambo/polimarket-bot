@@ -33,6 +33,42 @@ def run_bot_cycle() -> dict:
     health = run_polymarket_healthcheck()
     app_logger.info(f"POLYMARKET_HEALTHCHECK_OK={health['ok']}")
     app_logger.info(f"POLYMARKET_HEALTHCHECK_COUNT={health['count']}")
+    if not health["ok"]:
+        app_logger.warning(f"POLYMARKET_HEALTHCHECK_ERROR={health.get('error')}")
+
+        snapshot_payload = {
+            "timestamp_utc": datetime.now(UTC).isoformat(),
+            "app_env": settings.APP_ENV,
+            "initial_capital_usd": settings.INITIAL_CAPITAL_USD,
+            "kill_switch_usd": settings.KILL_SWITCH_USD,
+            "filters": {
+                "min_market_volume_usd": settings.MIN_MARKET_VOLUME_USD,
+                "max_spread": settings.MAX_SPREAD,
+                "max_slippage_pct": settings.MAX_SLIPPAGE_PCT,
+                "probability_range": [0.60, 0.80],
+            },
+            "healthcheck": health,
+            "raw_markets_count": 0,
+            "candidate_markets_count": 0,
+            "top_candidates": [],
+            "evaluation_result": None,
+            "portfolio_summary": None,
+            "account_state": None,
+            "kill_switch_triggered": False,
+            "simulated_entry": None,
+            "paper_trade_result": None,
+        }
+
+        snapshot_path = write_snapshot(snapshot_payload)
+        app_logger.info(f"SNAPSHOT_SAVED={snapshot_path}")
+
+        return {
+            "health": health,
+            "candidate_markets_count": 0,
+            "account_state": None,
+            "kill_switch_triggered": False,
+            "snapshot_path": snapshot_path,
+        }
 
     client = PolymarketClient(base_url=settings.POLYMARKET_API_BASE)
     raw_markets = client.get_markets_raw(limit=100, active=True, closed=False)
