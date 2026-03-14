@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from src.config.settings import get_settings
+from src.live.preflight_checks import run_live_preflight_checks
 from src.portfolio.ledger_store import load_positions, load_trades
 
 
@@ -174,9 +175,9 @@ def get_service_status(service_name: str) -> str:
 def build_status_badge(label: str, value: str) -> str:
     normalized = str(value).strip().lower()
 
-    if normalized in {"active", "enabled", "true", "on"}:
+    if normalized in {"active", "enabled", "true", "on", "ready", "paper", "live"}:
         dot_class = "dot-green"
-    elif normalized in {"inactive", "disabled", "false", "off", "unknown"}:
+    elif normalized in {"inactive", "disabled", "false", "off", "unknown", "not ready"}:
         dot_class = "dot-red"
     else:
         dot_class = "dot-amber"
@@ -203,6 +204,7 @@ def build_empty_candidates_notice() -> str:
 
 def build_dashboard_html() -> str:
     settings = get_settings()
+    live_preflight = run_live_preflight_checks()
     positions = load_positions()
     trades = load_trades()
     snapshots = load_latest_snapshots(limit=20)
@@ -272,7 +274,6 @@ def build_dashboard_html() -> str:
 
     trade_rows = []
     for trade in recent_trades:
-        notional = trade.get("notional_usd", "-")
         trade_rows.append(
             [
                 format_timestamp(trade.get("timestamp_utc", "-")),
@@ -280,7 +281,7 @@ def build_dashboard_html() -> str:
                 trade.get("action", "-"),
                 trade.get("price", "-"),
                 trade.get("shares", "-"),
-                notional,
+                trade.get("notional_usd", "-"),
             ]
         )
 
@@ -302,6 +303,8 @@ def build_dashboard_html() -> str:
     dashboard_service_status = get_service_status("polymarket-dashboard.service")
     telegram_status = "enabled" if (settings.TELEGRAM_BOT_TOKEN and settings.TELEGRAM_CHAT_ID) else "disabled"
     kill_switch_status = "on" if latest_snapshot.get("kill_switch_triggered", False) else "off"
+    trading_mode_status = settings.TRADING_MODE
+    live_readiness_status = "ready" if live_preflight.get("ready_for_live") else "not ready"
 
     summary_cards = [
         ("Cash Available", format_float(account_state.get("cash_available"))),
@@ -334,6 +337,8 @@ def build_dashboard_html() -> str:
             build_status_badge("Dashboard Service", dashboard_service_status),
             build_status_badge("Telegram", telegram_status),
             build_status_badge("Kill Switch", kill_switch_status),
+            build_status_badge("Trading Mode", trading_mode_status),
+            build_status_badge("Live Readiness", live_readiness_status),
         ]
     )
 
