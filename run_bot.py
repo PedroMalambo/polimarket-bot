@@ -8,6 +8,7 @@ from src.monitoring.daily_summary import (
 )
 from src.monitoring.logger import app_logger
 from src.monitoring.telegram_notifier import send_telegram_message
+from src.reporting.dashboard_generator import generate_dashboard
 
 
 def main() -> None:
@@ -43,6 +44,9 @@ def main() -> None:
                     app_logger.info("DAILY_SUMMARY_SENT=True")
                 else:
                     app_logger.warning("DAILY_SUMMARY_SENT=False")
+
+            dashboard_path = generate_dashboard()
+            app_logger.info(f"DASHBOARD_GENERATED={dashboard_path}")
         except Exception as exc:
             app_logger.exception(f"BOT_LOOP_ITERATION_FAILED={iteration} | error={exc}")
 
