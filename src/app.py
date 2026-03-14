@@ -5,6 +5,7 @@ from src.config.settings import get_settings
 from src.execution.paper_entry import simulate_paper_entry
 from src.execution.paper_trader import evaluate_open_positions, open_paper_position
 from src.monitoring.logger import app_logger
+from src.monitoring.telegram_notifier import send_telegram_message
 from src.portfolio.paper_account import calculate_account_state, is_kill_switch_triggered
 from src.portfolio.portfolio_valuation import calculate_open_positions_valuation
 from src.strategy.market_selector import filter_candidate_markets
@@ -87,6 +88,17 @@ def run_bot_cycle() -> dict:
             f"closed_at_utc={position['closed_at_utc']}"
         )
 
+        send_telegram_message(
+            "🔴 PAPER POSITION CLOSED\n"
+            f"Market: {position['market_id']}\n"
+            f"Question: {position['question']}\n"
+            f"Reason: {position['close_reason']}\n"
+            f"Entry: {entry_price}\n"
+            f"Exit: {current_price}\n"
+            f"Shares: {shares}\n"
+            f"Realized PnL: {realized_pnl}"
+        )
+
     portfolio_summary = calculate_open_positions_valuation(raw_markets)
     app_logger.info(
         f"PORTFOLIO_SUMMARY="
@@ -165,6 +177,17 @@ def run_bot_cycle() -> dict:
                 f"trades_count={paper_trade_result['trades_count']} | "
                 f"position_id={paper_trade_result['position']['position_id']} | "
                 f"market_id={paper_trade_result['position']['market_id']}"
+            )
+
+            opened_position = paper_trade_result["position"]
+            send_telegram_message(
+                "🟢 PAPER POSITION OPENED\n"
+                f"Market: {opened_position['market_id']}\n"
+                f"Question: {opened_position['question']}\n"
+                f"Entry: {opened_position['entry_price']}\n"
+                f"Shares: {opened_position['shares']}\n"
+                f"Stop Loss: {opened_position['stop_loss_price']}\n"
+                f"Take Profit: {opened_position['take_profit_price']}"
             )
         else:
             skip_reason = paper_trade_result.get("reason", "UNKNOWN")
