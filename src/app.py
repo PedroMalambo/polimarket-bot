@@ -13,6 +13,7 @@ from src.portfolio.ledger_store import load_positions
 from src.portfolio.portfolio_valuation import calculate_open_positions_valuation
 from src.strategy.market_selector import filter_candidate_markets
 from src.strategy.openclaw_decider import decide_market_with_openclaw
+from src.strategy.mirror_feeder import get_whale_signals # <-- NUEVO IMPORT
 from src.utils.healthcheck import run_polymarket_healthcheck
 from src.utils.snapshot_store import write_snapshot
 
@@ -152,11 +153,9 @@ def run_bot_cycle() -> dict:
     # --- FILTRO DE EXPOSICIÓN SEMÁNTICA (ANTI-CONCENTRACIÓN) ---
     candidates_before_exposure_filter_count = len(candidates)
     
-    # Extraemos las preguntas de las posiciones actualmente abiertas
     current_positions = load_positions()
     open_questions = [p.get("question", "") for p in current_positions if p.get("status") == "OPEN" and p.get("question")]
 
-    # Aplicamos nuestro nuevo filtro
     candidates, excluded_exposure_details = filter_candidates_by_exposure(
         candidates=candidates,
         open_questions=open_questions,
@@ -307,6 +306,28 @@ def run_bot_cycle() -> dict:
             f"Max Allowed USD: {settings.MAX_COMMITTED_CAPITAL_USD}"
         )
     elif candidates:
+        # --- INICIO: INTEGRACIÓN DEL MONITOR DE BALLENAS ---
+        try:
+            whale_signals = get_whale_signals("0x02227b8f5a9636e895607edd3185ed6ee5598ff7")
+            # Extraemos IDs (conditionId o asset) de los trades de la ballena
+            whale_ids = {str(s.get('conditionId', s.get('asset'))) for s in whale_signals}
+            
+            for market in candidates:
+                if str(market.get('id')) in whale_ids:
+                    market['whale_signal'] = True
+                    market['score'] = market.get('score', 0) + 0.50 # Bonus masivo al score
+                    app_logger.info(
+                        f"🐳 ALERTA BALLENA: Mercado promovido al Top. "
+                        f"Question: {market['question']} | Nuevo Score: {market['score']}"
+                    )
+            
+            # Reordenar la lista para que las opciones de la ballena suban al TOP 5
+            candidates.sort(key=lambda x: x.get("score", 0), reverse=True)
+            
+        except Exception as e:
+            app_logger.error(f"Error procesando señales de la ballena: {e}")
+        # --- FIN: INTEGRACIÓN DEL MONITOR DE BALLENAS ---
+
         openclaw_decision_result = decide_market_with_openclaw(
             candidates=candidates[:5],
             account_state=account_state,
