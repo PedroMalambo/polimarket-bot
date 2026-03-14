@@ -278,7 +278,7 @@ def run_bot_cycle() -> dict:
             app_logger.warning(
                 "OPENCLAW_DECISION_FAILED="
                 f"error={openclaw_decision_result.get('error')} | "
-                f"assistant_text={openclaw_decision_result.get('assistant_text')}"
+                f"session_key={openclaw_decision_result.get('session_key')}"
             )
 
         if selected_market is None and openclaw_decision_result.get("ok") is not True:
