@@ -1,7 +1,13 @@
 import time
 
 from src.app import run_bot_cycle
+from src.monitoring.daily_summary import (
+    build_daily_summary_message,
+    mark_daily_summary_sent,
+    should_send_daily_summary,
+)
 from src.monitoring.logger import app_logger
+from src.monitoring.telegram_notifier import send_telegram_message
 
 
 def main() -> None:
@@ -23,6 +29,20 @@ def main() -> None:
                 f"kill_switch_triggered={result['kill_switch_triggered']} | "
                 f"snapshot_path={result['snapshot_path']}"
             )
+
+            account_state = result.get("account_state")
+            if account_state and should_send_daily_summary():
+                summary_message = build_daily_summary_message(
+                    account_state=account_state,
+                    kill_switch_triggered=result["kill_switch_triggered"],
+                )
+                sent = send_telegram_message(summary_message)
+
+                if sent:
+                    mark_daily_summary_sent()
+                    app_logger.info("DAILY_SUMMARY_SENT=True")
+                else:
+                    app_logger.warning("DAILY_SUMMARY_SENT=False")
         except Exception as exc:
             app_logger.exception(f"BOT_LOOP_ITERATION_FAILED={iteration} | error={exc}")
 
