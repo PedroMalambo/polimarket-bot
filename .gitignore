@@ -25,3 +25,5 @@ data/portfolio/*
 data/runtime/
 
 reports/dashboard.html
+.env
+__pycache__/
