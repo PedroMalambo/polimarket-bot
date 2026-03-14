@@ -8,6 +8,7 @@ from src.live.execution_guard import evaluate_live_execution_guard
 from src.monitoring.logger import app_logger
 from src.monitoring.telegram_notifier import send_telegram_message
 from src.portfolio.paper_account import calculate_account_state, is_kill_switch_triggered
+from src.portfolio.ledger_store import load_positions
 from src.portfolio.portfolio_valuation import calculate_open_positions_valuation
 from src.strategy.market_selector import filter_candidate_markets
 from src.strategy.openclaw_decider import decide_market_with_openclaw
@@ -83,7 +84,37 @@ def run_bot_cycle() -> dict:
         max_spread=settings.MAX_SPREAD,
     )
 
+    positions = load_positions()
+    open_market_ids = {
+        str(position.get("market_id"))
+        for position in positions
+        if str(position.get("status", "")).upper() == "OPEN" and position.get("market_id") is not None
+    }
+
+    candidates_before_open_filter_count = len(candidates)
+    excluded_open_market_candidates = [
+        market for market in candidates
+        if str(market.get("id")) in open_market_ids
+    ]
+    candidates = [
+        market for market in candidates
+        if str(market.get("id")) not in open_market_ids
+    ]
+    excluded_open_market_candidates_count = len(excluded_open_market_candidates)
+
     app_logger.info(f"RAW_MARKETS_COUNT={len(raw_markets)}")
+    app_logger.info(
+        f"CANDIDATE_MARKETS_PRE_OPEN_FILTER_COUNT={candidates_before_open_filter_count}"
+    )
+    app_logger.info(
+        f"OPEN_MARKET_CANDIDATES_EXCLUDED_COUNT={excluded_open_market_candidates_count}"
+    )
+    for excluded_market in excluded_open_market_candidates:
+        app_logger.info(
+            "OPEN_MARKET_CANDIDATE_EXCLUDED="
+            f"market_id={excluded_market.get('id')} | "
+            f"question={excluded_market.get('question')}"
+        )
     app_logger.info(f"CANDIDATE_MARKETS_COUNT={len(candidates)}")
 
     for idx, market in enumerate(candidates[:10], start=1):
