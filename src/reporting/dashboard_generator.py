@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import html
 import json
+import subprocess
 from pathlib import Path
 
+from src.config.settings import get_settings
 from src.portfolio.ledger_store import load_positions, load_trades
 
 
@@ -120,7 +122,43 @@ def build_equity_svg(snapshots: list[dict]) -> str:
     """
 
 
+def get_service_status(service_name: str) -> str:
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", service_name],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        status = (result.stdout or "").strip()
+        return status or "unknown"
+    except Exception:
+        return "unknown"
+
+
+def build_status_badge(label: str, value: str) -> str:
+    normalized = str(value).strip().lower()
+
+    if normalized in {"active", "enabled", "true", "on"}:
+        dot_class = "dot-green"
+    elif normalized in {"inactive", "disabled", "false", "off", "unknown"}:
+        dot_class = "dot-red"
+    else:
+        dot_class = "dot-amber"
+
+    return f"""
+    <div class="status-card">
+        <div class="status-label">{html.escape(label)}</div>
+        <div class="status-value">
+            <span class="dot {dot_class}"></span>
+            {html.escape(value)}
+        </div>
+    </div>
+    """
+
+
 def build_dashboard_html() -> str:
+    settings = get_settings()
     positions = load_positions()
     trades = load_trades()
     snapshots = load_latest_snapshots(limit=20)
@@ -128,6 +166,7 @@ def build_dashboard_html() -> str:
     latest_snapshot = snapshots[0] if snapshots else {}
     account_state = latest_snapshot.get("account_state") or {}
     portfolio_summary = latest_snapshot.get("portfolio_summary") or {}
+    top_candidates = latest_snapshot.get("top_candidates") or []
 
     open_positions = [p for p in positions if p.get("status") == "OPEN"]
     closed_positions = [p for p in positions if p.get("status") == "CLOSED"]
@@ -200,6 +239,25 @@ def build_dashboard_html() -> str:
             ]
         )
 
+    candidate_rows = []
+    for item in top_candidates[:10]:
+        candidate_rows.append(
+            [
+                item.get("id", "-"),
+                item.get("question", "-"),
+                item.get("score", "-"),
+                item.get("yes_price", "-"),
+                item.get("spread", "-"),
+                item.get("volume", "-"),
+                item.get("liquidity", "-"),
+            ]
+        )
+
+    bot_service_status = get_service_status("polymarket-bot.service")
+    dashboard_service_status = get_service_status("polymarket-dashboard.service")
+    telegram_status = "enabled" if (settings.TELEGRAM_BOT_TOKEN and settings.TELEGRAM_CHAT_ID) else "disabled"
+    kill_switch_status = "on" if latest_snapshot.get("kill_switch_triggered", False) else "off"
+
     summary_cards = [
         ("Cash Available", format_float(account_state.get("cash_available"))),
         ("Capital Committed", format_float(account_state.get("capital_committed"))),
@@ -223,6 +281,15 @@ def build_dashboard_html() -> str:
         </div>
         """
         for title, value in summary_cards
+    )
+
+    status_html = "".join(
+        [
+            build_status_badge("Bot Service", bot_service_status),
+            build_status_badge("Dashboard Service", dashboard_service_status),
+            build_status_badge("Telegram", telegram_status),
+            build_status_badge("Kill Switch", kill_switch_status),
+        ]
     )
 
     equity_chart = build_equity_svg(snapshots)
@@ -260,6 +327,11 @@ def build_dashboard_html() -> str:
         trade_rows,
     )
 
+    candidate_table = render_table(
+        ["Market ID", "Question", "Score", "Yes Price", "Spread", "Volume", "Liquidity"],
+        candidate_rows,
+    )
+
     recent_snapshots_table = render_table(
         ["Snapshot File", "Timestamp UTC", "Candidate Markets", "Equity", "Cash", "Kill Switch"],
         snapshot_rows,
@@ -292,13 +364,19 @@ def build_dashboard_html() -> str:
             gap: 16px;
             margin-bottom: 28px;
         }}
-        .card {{
+        .status-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
+        }}
+        .card, .status-card {{
             background: #111827;
             border: 1px solid #1f2937;
             border-radius: 12px;
             padding: 16px;
         }}
-        .card-title {{
+        .card-title, .status-label {{
             font-size: 12px;
             color: #94a3b8;
             margin-bottom: 8px;
@@ -307,6 +385,28 @@ def build_dashboard_html() -> str:
         .card-value {{
             font-size: 22px;
             font-weight: bold;
+        }}
+        .status-value {{
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }}
+        .dot {{
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            display: inline-block;
+        }}
+        .dot-green {{
+            background: #22c55e;
+        }}
+        .dot-red {{
+            background: #ef4444;
+        }}
+        .dot-amber {{
+            background: #f59e0b;
         }}
         .chart {{
             width: 100%;
@@ -338,11 +438,17 @@ def build_dashboard_html() -> str:
     <h1>Polymarket Bot Dashboard</h1>
     <div class="muted">Generated from local bot data and snapshots.</div>
 
+    <h2>Operational Status</h2>
+    <div class="status-grid">{status_html}</div>
+
     <h2>Account Summary</h2>
     <div class="grid">{cards_html}</div>
 
     <h2>Equity History</h2>
     {equity_chart}
+
+    <h2>Top Candidate Markets</h2>
+    {candidate_table}
 
     <h2>Open Positions</h2>
     {open_positions_table}

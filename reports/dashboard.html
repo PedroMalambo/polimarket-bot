@@ -25,13 +25,19 @@
             gap: 16px;
             margin-bottom: 28px;
         }
-        .card {
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+        .card, .status-card {
             background: #111827;
             border: 1px solid #1f2937;
             border-radius: 12px;
             padding: 16px;
         }
-        .card-title {
+        .card-title, .status-label {
             font-size: 12px;
             color: #94a3b8;
             margin-bottom: 8px;
@@ -40,6 +46,28 @@
         .card-value {
             font-size: 22px;
             font-weight: bold;
+        }
+        .status-value {
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            display: inline-block;
+        }
+        .dot-green {
+            background: #22c55e;
+        }
+        .dot-red {
+            background: #ef4444;
+        }
+        .dot-amber {
+            background: #f59e0b;
         }
         .chart {
             width: 100%;
@@ -70,6 +98,41 @@
 <body>
     <h1>Polymarket Bot Dashboard</h1>
     <div class="muted">Generated from local bot data and snapshots.</div>
+
+    <h2>Operational Status</h2>
+    <div class="status-grid">
+    <div class="status-card">
+        <div class="status-label">Bot Service</div>
+        <div class="status-value">
+            <span class="dot dot-green"></span>
+            active
+        </div>
+    </div>
+    
+    <div class="status-card">
+        <div class="status-label">Dashboard Service</div>
+        <div class="status-value">
+            <span class="dot dot-green"></span>
+            active
+        </div>
+    </div>
+    
+    <div class="status-card">
+        <div class="status-label">Telegram</div>
+        <div class="status-value">
+            <span class="dot dot-green"></span>
+            enabled
+        </div>
+    </div>
+    
+    <div class="status-card">
+        <div class="status-label">Kill Switch</div>
+        <div class="status-value">
+            <span class="dot dot-red"></span>
+            off
+        </div>
+    </div>
+    </div>
 
     <h2>Account Summary</h2>
     <div class="grid">
@@ -141,10 +204,13 @@
         <line x1="30" y1="230" x2="870" y2="230" stroke="#334155" />
         <line x1="30" y1="30" x2="30" y2="230" stroke="#334155" />
         <polyline fill="none" stroke="#38bdf8" stroke-width="3" points="30.00,130.00 74.21,130.00 118.42,130.00 162.63,130.00 206.84,130.00 251.05,130.00 295.26,130.00 339.47,130.00 383.68,130.00 427.89,130.00 472.11,130.00 516.32,130.00 560.53,130.00 604.74,130.00 648.95,130.00 693.16,130.00 737.37,130.00 781.58,130.00 825.79,130.00 870.00,130.00" />
-        <circle cx="30.00" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:17:33.267039+00:00 | Equity: 19.981422</title></circle><circle cx="74.21" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:21:12.148970+00:00 | Equity: 19.981422</title></circle><circle cx="118.42" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:22:40.496325+00:00 | Equity: 19.981422</title></circle><circle cx="162.63" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:27:41.157162+00:00 | Equity: 19.981422</title></circle><circle cx="206.84" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:30:14.745268+00:00 | Equity: 19.981422</title></circle><circle cx="251.05" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:30:36.330029+00:00 | Equity: 19.981422</title></circle><circle cx="295.26" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:35:36.856283+00:00 | Equity: 19.981422</title></circle><circle cx="339.47" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:40:37.493356+00:00 | Equity: 19.981422</title></circle><circle cx="383.68" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:45:38.124865+00:00 | Equity: 19.981422</title></circle><circle cx="427.89" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:50:38.667742+00:00 | Equity: 19.981422</title></circle><circle cx="472.11" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:55:39.348788+00:00 | Equity: 19.981422</title></circle><circle cx="516.32" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:00:39.996796+00:00 | Equity: 19.981422</title></circle><circle cx="560.53" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:05:40.640763+00:00 | Equity: 19.981422</title></circle><circle cx="604.74" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:06:14.306635+00:00 | Equity: 19.981422</title></circle><circle cx="648.95" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:10:41.291500+00:00 | Equity: 19.981422</title></circle><circle cx="693.16" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:15:42.396519+00:00 | Equity: 19.981422</title></circle><circle cx="737.37" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:19:52.592986+00:00 | Equity: 19.981422</title></circle><circle cx="781.58" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:20:42.901067+00:00 | Equity: 19.981422</title></circle><circle cx="825.79" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:25:43.541207+00:00 | Equity: 19.981422</title></circle><circle cx="870.00" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:30:44.155283+00:00 | Equity: 19.981422</title></circle>
+        <circle cx="30.00" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:35:36.856283+00:00 | Equity: 19.981422</title></circle><circle cx="74.21" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:40:37.493356+00:00 | Equity: 19.981422</title></circle><circle cx="118.42" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:45:38.124865+00:00 | Equity: 19.981422</title></circle><circle cx="162.63" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:50:38.667742+00:00 | Equity: 19.981422</title></circle><circle cx="206.84" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T01:55:39.348788+00:00 | Equity: 19.981422</title></circle><circle cx="251.05" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:00:39.996796+00:00 | Equity: 19.981422</title></circle><circle cx="295.26" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:05:40.640763+00:00 | Equity: 19.981422</title></circle><circle cx="339.47" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:06:14.306635+00:00 | Equity: 19.981422</title></circle><circle cx="383.68" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:10:41.291500+00:00 | Equity: 19.981422</title></circle><circle cx="427.89" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:15:42.396519+00:00 | Equity: 19.981422</title></circle><circle cx="472.11" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:19:52.592986+00:00 | Equity: 19.981422</title></circle><circle cx="516.32" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:20:42.901067+00:00 | Equity: 19.981422</title></circle><circle cx="560.53" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:25:43.541207+00:00 | Equity: 19.981422</title></circle><circle cx="604.74" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:30:44.155283+00:00 | Equity: 19.981422</title></circle><circle cx="648.95" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:35:44.794753+00:00 | Equity: 19.981422</title></circle><circle cx="693.16" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:40:44.941930+00:00 | Equity: 19.981422</title></circle><circle cx="737.37" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:45:45.193664+00:00 | Equity: 19.981422</title></circle><circle cx="781.58" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:50:45.455973+00:00 | Equity: 19.981422</title></circle><circle cx="825.79" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T02:55:45.703937+00:00 | Equity: 19.981422</title></circle><circle cx="870.00" cy="130.00" r="3" fill="#38bdf8"><title>2026-03-14T03:00:45.948345+00:00 | Equity: 19.981422</title></circle>
         <text x="30" y="20" fill="#94a3b8" font-size="12">Max: 19.981422</text><text x="30" y="252" fill="#94a3b8" font-size="12">Min: 19.981422</text>
     </svg>
     
+
+    <h2>Top Candidate Markets</h2>
+    <table><thead><tr><th>Market ID</th><th>Question</th><th>Score</th><th>Yes Price</th><th>Spread</th><th>Volume</th><th>Liquidity</th></tr></thead><tbody><tr><td colspan="7">No data</td></tr></tbody></table>
 
     <h2>Open Positions</h2>
     <table><thead><tr><th>Market ID</th><th>Question</th><th>Entry Price</th><th>Current Price</th><th>Shares</th><th>Stop Loss</th><th>Take Profit</th><th>Opened At UTC</th></tr></thead><tbody><tr><td>556108</td><td>Will MegaETH perform an airdrop by June 30? </td><td>0.6145</td><td>0.6145</td><td>6.3817</td><td>0.522325</td><td>0.95</td><td>2026-03-13T03:56:27.247956+00:00</td></tr><tr><td>540817</td><td>New Rihanna Album before GTA VI?</td><td>0.62</td><td>0.62</td><td>6.3441</td><td>0.527</td><td>0.95</td><td>2026-03-13T22:41:14.573241+00:00</td></tr></tbody></table>
@@ -156,6 +222,6 @@
     <table><thead><tr><th>Timestamp UTC</th><th>Market ID</th><th>Action</th><th>Price</th><th>Shares</th><th>Notional USD</th></tr></thead><tbody><tr><td>2026-03-13T22:59:11.480590+00:00</td><td>540818</td><td>SELL_YES_PAPER_TAKE_PROFIT</td><td>0.665</td><td>5.9871</td><td>3.981422</td></tr><tr><td>2026-03-13T22:41:14.573253+00:00</td><td>540817</td><td>BUY_YES_PAPER</td><td>0.62</td><td>6.3441</td><td>4.012</td></tr><tr><td>2026-03-13T04:02:07.800263+00:00</td><td>540818</td><td>BUY_YES_PAPER</td><td>0.655</td><td>5.9871</td><td>4.0</td></tr><tr><td>2026-03-13T03:56:27.247967+00:00</td><td>556108</td><td>BUY_YES_PAPER</td><td>0.6145</td><td>6.3817</td><td>4.0</td></tr></tbody></table>
 
     <h2>Recent Snapshots</h2>
-    <table><thead><tr><th>Snapshot File</th><th>Timestamp UTC</th><th>Candidate Markets</th><th>Equity</th><th>Cash</th><th>Kill Switch</th></tr></thead><tbody><tr><td>market_snapshot_20260314T023044Z.json</td><td>2026-03-14T02:30:44.155283+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T022543Z.json</td><td>2026-03-14T02:25:43.541207+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T022042Z.json</td><td>2026-03-14T02:20:42.901067+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T021952Z.json</td><td>2026-03-14T02:19:52.592986+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T021542Z.json</td><td>2026-03-14T02:15:42.396519+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T021041Z.json</td><td>2026-03-14T02:10:41.291500+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T020614Z.json</td><td>2026-03-14T02:06:14.306635+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T020540Z.json</td><td>2026-03-14T02:05:40.640763+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T020039Z.json</td><td>2026-03-14T02:00:39.996796+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T015539Z.json</td><td>2026-03-14T01:55:39.348788+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T015038Z.json</td><td>2026-03-14T01:50:38.667742+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T014538Z.json</td><td>2026-03-14T01:45:38.124865+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T014037Z.json</td><td>2026-03-14T01:40:37.493356+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T013536Z.json</td><td>2026-03-14T01:35:36.856283+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T013036Z.json</td><td>2026-03-14T01:30:36.330029+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T013014Z.json</td><td>2026-03-14T01:30:14.745268+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T012741Z.json</td><td>2026-03-14T01:27:41.157162+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T012240Z.json</td><td>2026-03-14T01:22:40.496325+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T012112Z.json</td><td>2026-03-14T01:21:12.148970+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T011733Z.json</td><td>2026-03-14T01:17:33.267039+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr></tbody></table>
+    <table><thead><tr><th>Snapshot File</th><th>Timestamp UTC</th><th>Candidate Markets</th><th>Equity</th><th>Cash</th><th>Kill Switch</th></tr></thead><tbody><tr><td>market_snapshot_20260314T030045Z.json</td><td>2026-03-14T03:00:45.948345+00:00</td><td>0</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T025545Z.json</td><td>2026-03-14T02:55:45.703937+00:00</td><td>0</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T025045Z.json</td><td>2026-03-14T02:50:45.455973+00:00</td><td>0</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T024545Z.json</td><td>2026-03-14T02:45:45.193664+00:00</td><td>0</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T024044Z.json</td><td>2026-03-14T02:40:44.941930+00:00</td><td>0</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T023544Z.json</td><td>2026-03-14T02:35:44.794753+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T023044Z.json</td><td>2026-03-14T02:30:44.155283+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T022543Z.json</td><td>2026-03-14T02:25:43.541207+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T022042Z.json</td><td>2026-03-14T02:20:42.901067+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T021952Z.json</td><td>2026-03-14T02:19:52.592986+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T021542Z.json</td><td>2026-03-14T02:15:42.396519+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T021041Z.json</td><td>2026-03-14T02:10:41.291500+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T020614Z.json</td><td>2026-03-14T02:06:14.306635+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T020540Z.json</td><td>2026-03-14T02:05:40.640763+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T020039Z.json</td><td>2026-03-14T02:00:39.996796+00:00</td><td>1</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T015539Z.json</td><td>2026-03-14T01:55:39.348788+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T015038Z.json</td><td>2026-03-14T01:50:38.667742+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T014538Z.json</td><td>2026-03-14T01:45:38.124865+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T014037Z.json</td><td>2026-03-14T01:40:37.493356+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr><tr><td>market_snapshot_20260314T013536Z.json</td><td>2026-03-14T01:35:36.856283+00:00</td><td>2</td><td>19.981422</td><td>12.126525</td><td>False</td></tr></tbody></table>
 </body>
 </html>
