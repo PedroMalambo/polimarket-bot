@@ -21,3 +21,7 @@ data/portfolio/*
 .DS_Store
 .vscode/
 .idea/
+
+data/runtime/
+
+reports/dashboard.html

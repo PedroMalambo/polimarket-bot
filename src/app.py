@@ -224,7 +224,17 @@ def run_bot_cycle() -> dict:
             max_committed_capital_usd=settings.MAX_COMMITTED_CAPITAL_USD,
             max_live_order_usd=settings.MAX_LIVE_ORDER_USD,
         )
-        app_logger.info(f"OPENCLAW_DECISION_RESULT={openclaw_decision_result}")
+        decision_summary = openclaw_decision_result.get("decision") or {}
+        app_logger.info(
+            "OPENCLAW_DECISION_RESULT="
+            f"ok={openclaw_decision_result.get('ok')} | "
+            f"action={decision_summary.get('action')} | "
+            f"market_id={decision_summary.get('market_id')} | "
+            f"confidence={decision_summary.get('confidence')} | "
+            f"reason={decision_summary.get('reason')} | "
+            f"session_key={openclaw_decision_result.get('session_key')} | "
+            f"error={openclaw_decision_result.get('error')}"
+        )
 
         selected_market = None
 
