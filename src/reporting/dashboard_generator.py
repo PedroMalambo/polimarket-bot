@@ -13,7 +13,7 @@ REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 DASHBOARD_FILE = REPORTS_DIR / "dashboard.html"
 
 
-def load_latest_snapshots(limit: int = 10) -> list[dict]:
+def load_latest_snapshots(limit: int = 20) -> list[dict]:
     snapshot_files = sorted(SNAPSHOT_DIR.glob("market_snapshot_*.json"), reverse=True)[:limit]
     snapshots: list[dict] = []
 
@@ -47,16 +47,91 @@ def render_table(headers: list[str], rows: list[list[object]]) -> str:
     return f"<table><thead><tr>{thead}</tr></thead><tbody>{tbody}</tbody></table>"
 
 
+def build_equity_svg(snapshots: list[dict]) -> str:
+    points: list[tuple[str, float]] = []
+
+    for snapshot in reversed(snapshots):
+        account = snapshot.get("account_state") or {}
+        equity = account.get("equity_estimate")
+        timestamp = snapshot.get("timestamp_utc", "-")
+        if equity is None:
+            continue
+        try:
+            points.append((timestamp, float(equity)))
+        except Exception:
+            continue
+
+    if len(points) < 2:
+        return '<div class="muted">Not enough equity history to render chart.</div>'
+
+    width = 900
+    height = 260
+    padding = 30
+
+    values = [value for _, value in points]
+    min_value = min(values)
+    max_value = max(values)
+
+    if max_value == min_value:
+        max_value += 1.0
+        min_value -= 1.0
+
+    def scale_x(index: int) -> float:
+        usable_width = width - (padding * 2)
+        return padding + (usable_width * index / max(1, len(points) - 1))
+
+    def scale_y(value: float) -> float:
+        usable_height = height - (padding * 2)
+        ratio = (value - min_value) / (max_value - min_value)
+        return height - padding - (ratio * usable_height)
+
+    polyline_points = " ".join(
+        f"{scale_x(idx):.2f},{scale_y(value):.2f}"
+        for idx, (_, value) in enumerate(points)
+    )
+
+    circles = []
+    labels = []
+    for idx, (timestamp, value) in enumerate(points):
+        x = scale_x(idx)
+        y = scale_y(value)
+        circles.append(
+            f'<circle cx="{x:.2f}" cy="{y:.2f}" r="3" fill="#38bdf8">'
+            f'<title>{html.escape(timestamp)} | Equity: {value:.6f}</title>'
+            f'</circle>'
+        )
+
+    labels.append(
+        f'<text x="{padding}" y="{padding - 10}" fill="#94a3b8" font-size="12">Max: {max(values):.6f}</text>'
+    )
+    labels.append(
+        f'<text x="{padding}" y="{height - 8}" fill="#94a3b8" font-size="12">Min: {min(values):.6f}</text>'
+    )
+
+    return f"""
+    <svg viewBox="0 0 {width} {height}" class="chart">
+        <rect x="0" y="0" width="{width}" height="{height}" fill="#111827" rx="12"></rect>
+        <line x1="{padding}" y1="{height - padding}" x2="{width - padding}" y2="{height - padding}" stroke="#334155" />
+        <line x1="{padding}" y1="{padding}" x2="{padding}" y2="{height - padding}" stroke="#334155" />
+        <polyline fill="none" stroke="#38bdf8" stroke-width="3" points="{polyline_points}" />
+        {''.join(circles)}
+        {''.join(labels)}
+    </svg>
+    """
+
+
 def build_dashboard_html() -> str:
     positions = load_positions()
     trades = load_trades()
-    snapshots = load_latest_snapshots(limit=10)
+    snapshots = load_latest_snapshots(limit=20)
 
     latest_snapshot = snapshots[0] if snapshots else {}
     account_state = latest_snapshot.get("account_state") or {}
     portfolio_summary = latest_snapshot.get("portfolio_summary") or {}
 
     open_positions = [p for p in positions if p.get("status") == "OPEN"]
+    closed_positions = [p for p in positions if p.get("status") == "CLOSED"]
+
     recent_trades = sorted(
         trades,
         key=lambda x: x.get("timestamp_utc", ""),
@@ -89,6 +164,26 @@ def build_dashboard_html() -> str:
                 position.get("stop_loss_price", "-"),
                 position.get("take_profit_price", "-"),
                 position.get("opened_at_utc", "-"),
+            ]
+        )
+
+    closed_position_rows = []
+    for position in sorted(closed_positions, key=lambda x: x.get("closed_at_utc", ""), reverse=True)[:10]:
+        entry_price = float(position.get("entry_price", 0.0) or 0.0)
+        current_price = float(position.get("current_price", entry_price) or entry_price)
+        shares = float(position.get("shares", 0.0) or 0.0)
+        realized_pnl = round((current_price - entry_price) * shares, 6)
+
+        closed_position_rows.append(
+            [
+                position.get("market_id", "-"),
+                position.get("question", "-"),
+                position.get("close_reason", "-"),
+                position.get("entry_price", "-"),
+                position.get("current_price", "-"),
+                position.get("shares", "-"),
+                realized_pnl,
+                position.get("closed_at_utc", "-"),
             ]
         )
 
@@ -130,6 +225,8 @@ def build_dashboard_html() -> str:
         for title, value in summary_cards
     )
 
+    equity_chart = build_equity_svg(snapshots)
+
     open_positions_table = render_table(
         [
             "Market ID",
@@ -142,6 +239,20 @@ def build_dashboard_html() -> str:
             "Opened At UTC",
         ],
         position_rows,
+    )
+
+    closed_positions_table = render_table(
+        [
+            "Market ID",
+            "Question",
+            "Close Reason",
+            "Entry Price",
+            "Exit Price",
+            "Shares",
+            "Realized PnL",
+            "Closed At UTC",
+        ],
+        closed_position_rows,
     )
 
     recent_trades_table = render_table(
@@ -197,6 +308,12 @@ def build_dashboard_html() -> str:
             font-size: 22px;
             font-weight: bold;
         }}
+        .chart {{
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 28px;
+        }}
         table {{
             width: 100%;
             border-collapse: collapse;
@@ -224,8 +341,14 @@ def build_dashboard_html() -> str:
     <h2>Account Summary</h2>
     <div class="grid">{cards_html}</div>
 
+    <h2>Equity History</h2>
+    {equity_chart}
+
     <h2>Open Positions</h2>
     {open_positions_table}
+
+    <h2>Closed Positions</h2>
+    {closed_positions_table}
 
     <h2>Recent Trades</h2>
     {recent_trades_table}
