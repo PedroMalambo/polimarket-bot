@@ -76,12 +76,12 @@ def run_bot_cycle() -> dict:
         }
 
     client = PolymarketClient(base_url=settings.POLYMARKET_API_BASE)
-    raw_markets = client.get_markets_raw(limit=100, active=True, closed=False)
+    raw_markets = client.get_markets_raw(limit=1000, active=True, closed=False)
 
     candidates = filter_candidate_markets(
         markets=raw_markets,
-        min_prob=0.60,
-        max_prob=0.80,
+        min_prob=0.05,
+        max_prob=0.95,
         min_volume=settings.MIN_MARKET_VOLUME_USD,
         max_spread=settings.MAX_SPREAD,
     )
