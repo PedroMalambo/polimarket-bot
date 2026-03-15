@@ -415,17 +415,46 @@ def run_bot_cycle() -> dict:
                 app_logger.info(f"LIVE_GUARD_RESULT={live_guard_result}")
 
                 if live_guard_result.get("allowed"):
-                    app_logger.warning(
-                        "LIVE_EXECUTION_NOT_IMPLEMENTED="
-                        f"market_id={simulated_entry['market_id']} | "
-                        f"risk_amount_usd={simulated_entry.get('risk_amount_usd')}"
-                    )
-                    send_telegram_message(
-                        "🟣 LIVE EXECUTION AUTHORIZED\n"
-                        f"Market: {simulated_entry['market_id']}\n"
-                        f"Risk Amount USD: {simulated_entry.get('risk_amount_usd')}\n"
-                        "Live order placement is not implemented yet."
-                    )
+                    app_logger.info("🔥 INICIANDO EJECUCIÓN EN VIVO (FUEGO REAL)...")
+                    try:
+                        import os
+                        from py_clob_client.client import ClobClient
+                        from py_clob_client.clob_types import OrderArgs
+                        
+                        # 1. Configurar cliente criptográfico real
+                        host = settings.POLYMARKET_CLOB_BASE
+                        key = os.getenv("PRIVATE_KEY")
+                        chain_id = 137 # Red Polygon
+                        
+                        clob_client = ClobClient(host, key=key, chain_id=chain_id)
+                        creds = clob_client.create_or_derive_api_creds()
+                        clob_client.set_api_creds(creds)
+                        
+                        # 2. Identificar el Token ID exacto para apostar al "YES"
+                        market_info = clob_client.get_market(simulated_entry['market_id'])
+                        yes_token_id = market_info['tokens'][0]['token_id']
+                        
+                        # 3. Preparar la orden real
+                        order_args = OrderArgs(
+                            price=simulated_entry['entry_price'],
+                            size=simulated_entry.get('risk_amount_usd', 2.0), # Dinero real a invertir
+                            side="BUY",
+                            token_id=yes_token_id
+                        )
+                        
+                        # 4. 🔥 DISPARAR ORDEN A LA BLOCKCHAIN 🔥
+                        resp = clob_client.create_and_post_order(order_args)
+                        
+                        app_logger.info(f"✅ ORDEN REAL EJECUTADA: {resp}")
+                        send_telegram_message(
+                            "🔥 ¡FUEGO REAL! POSICIÓN ABIERTA\n"
+                            f"Mercado: {simulated_entry['market_id']}\n"
+                            f"Inversión Real: ${simulated_entry.get('risk_amount_usd', 2.0)} USD\n"
+                            "¡Operación confirmada en la blockchain de Polygon!"
+                        )
+                    except Exception as e:
+                        app_logger.error(f"❌ Error al disparar orden real: {e}")
+                        send_telegram_message(f"❌ ERROR DE FUEGO REAL: {e}")
                 else:
                     app_logger.warning(
                         "LIVE_EXECUTION_BLOCKED="
