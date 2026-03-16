@@ -68,20 +68,21 @@ def build_openclaw_decision_prompt(
     max_live_order_usd: float,
 ) -> str:
     payload = {
-        "task": "Select at most one market candidate for a Polymarket trading bot.",
+        "task": "Act as an aggressive Quantitative Analyst for a Polymarket hedge fund. Your goal is to find mispriced markets with Positive Expected Value (+EV).",
         "instructions": [
-            "Return valid JSON only.",
-            "Do not use markdown.",
-            "Do not add explanations outside JSON.",
-            "If no trade should be taken, return action=SKIP.",
-            "Only choose a market_id from the provided candidates.",
-            "Be conservative with risk sizing."
+            "Return valid JSON only. Do not use markdown. Do not add explanations outside JSON.",
+            "Compare the market 'yes_price' (implied probability) against real-world logic, news, and statistical probability.",
+            "If the crowd is overestimating an event (price is too high), bet AGAINST them: return action=BUY_NO.",
+            "If the crowd is underestimating an event (price is too low), bet with value: return action=BUY_YES.",
+            "If no clear statistical edge is found or the market is efficient, return action=SKIP.",
+            "Be aggressive when you find a real edge (+EV), but justify it in the 'reason' field.",
+            "Only choose a market_id from the provided candidates."
         ],
         "output_schema": {
-            "action": "BUY or SKIP",
+            "action": "BUY_YES, BUY_NO, or SKIP",
             "market_id": "string",
             "confidence": "float between 0 and 1",
-            "reason": "short string",
+            "reason": "detailed explanation of the mispricing and why this trade has +EV",
             "max_order_usd": "float >= 0"
         },
         "bot_context": {
@@ -92,20 +93,28 @@ def build_openclaw_decision_prompt(
             "account_state": account_state,
         },
         "candidates": candidates[:10],
-        "good_output_example": {
-            "action": "BUY",
-            "market_id": "123456",
-            "confidence": 0.78,
-            "reason": "best spread and liquidity profile",
-            "max_order_usd": 1.5
-        },
-        "skip_output_example": {
-            "action": "SKIP",
-            "market_id": "",
-            "confidence": 0.21,
-            "reason": "no candidate has a sufficiently attractive setup",
-            "max_order_usd": 0.0
-        }
+        "examples": [
+            {
+                "scenario": "Market price for YES is 0.10 (10%), but you estimate true probability is 25%",
+                "output": {
+                    "action": "BUY_YES",
+                    "market_id": "999",
+                    "confidence": 0.85,
+                    "reason": "Market severely underestimates YES. Buying at 0.10 with 25% true odds provides massive +EV.",
+                    "max_order_usd": 3.0
+                }
+            },
+            {
+                "scenario": "Market price for YES is 0.90 (90%), but it's a volatile event with 60% real odds",
+                "output": {
+                    "action": "BUY_NO",
+                    "market_id": "888",
+                    "confidence": 0.92,
+                    "reason": "YES is overvalued at 0.90. Betting NO at 0.10 is a high-value play against an irrational crowd.",
+                    "max_order_usd": 3.0
+                }
+            }
+        ]
     }
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
