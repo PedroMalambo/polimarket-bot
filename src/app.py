@@ -1,3 +1,4 @@
+from src.portfolio.live_account import get_real_polymarket_balance
 from src.strategy.exposure_manager import filter_candidates_by_exposure
 from datetime import datetime, UTC
 
@@ -251,7 +252,17 @@ def run_bot_cycle() -> dict:
             f"question={position['question']}"
         )
 
+    # 1. Calculamos el estado base (posiciones y costos internos)
     account_state = calculate_account_state(settings.INITIAL_CAPITAL_USD)
+    
+    # 2. REINGENIERÍA: Sobrescribimos el efectivo con el saldo REAL de Polymarket
+    live_balance = get_real_polymarket_balance()
+    if live_balance > 0:
+        account_state["cash_available"] = round(live_balance, 6)
+        # El equity total es el saldo real + el valor de las posiciones que tenga el bot
+        account_state["equity_estimate"] = round(live_balance + account_state["open_market_value"], 6)
+
+    # 3. RESTAURAR EL KILL SWITCH
     kill_switch_triggered = is_kill_switch_triggered(
         equity_estimate=account_state["equity_estimate"],
         kill_switch_usd=settings.KILL_SWITCH_USD,
